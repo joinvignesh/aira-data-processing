@@ -157,6 +157,109 @@ class CustomerFeaturePipelineService:
 
         return int(row[0])
 
+    def _upsert_basic_features(self, tenant_id: str, checkpoint_after):
+        result = self.session.exec(
+            text("""
+                WITH base_events AS (
+                    SELECT
+                        e.tenant_id,
+                        e.customer_id,
+                        e.product_id,
+                        e.event_type,
+                        e.timestamp,
+                        p.category
+                    FROM events e
+                    LEFT JOIN products p
+                      ON p.id = e.product_id
+                     AND p.tenant_id = e.tenant_id
+                    INNER JOIN tmp_affected_customers ac
+                      ON ac.customer_id = e.customer_id
+                    WHERE e.tenant_id = :tenant_id
+                ),
+                aggregates AS (
+                    SELECT
+                        tenant_id,
+                        customer_id,
+                        COUNT(*) FILTER (WHERE event_type IN ('page_view', 'product_view')) AS total_views,
+                        COUNT(*) FILTER (WHERE event_type = 'add_to_cart') AS total_cart_adds,
+                        COUNT(*) FILTER (WHERE event_type = 'purchase') AS total_purchases,
+                        COUNT(DISTINCT product_id) FILTER (WHERE product_id IS NOT NULL) AS distinct_products_viewed,
+                        COUNT(DISTINCT category) FILTER (WHERE category IS NOT NULL) AS distinct_categories_viewed,
+                        CURRENT_DATE - MIN(timestamp::date) AS days_since_first_seen,
+                        CURRENT_DATE - MAX(timestamp::date) AS days_since_last_activity
+                    FROM base_events
+                    GROUP BY tenant_id, customer_id
+                )
+                INSERT INTO customer_features (
+                    tenant_id,
+                    customer_id,
+                    total_views,
+                    total_cart_adds,
+                    total_purchases,
+                    distinct_products_viewed,
+                    distinct_categories_viewed,
+                    days_since_first_seen,
+                    days_since_last_activity,
+                    updated_at
+                )
+                SELECT
+                    tenant_id,
+                    customer_id,
+                    total_views,
+                    total_cart_adds,
+                    total_purchases,
+                    distinct_products_viewed,
+                    distinct_categories_viewed,
+                    days_since_first_seen,
+                    days_since_last_activity,
+                    :checkpoint_after
+                FROM aggregates
+                ON CONFLICT (tenant_id, customer_id)
+                DO UPDATE SET
+                    total_views = EXCLUDED.total_views,
+                    total_cart_adds = EXCLUDED.total_cart_adds,
+                    total_purchases = EXCLUDED.total_purchases,
+                    distinct_products_viewed = EXCLUDED.distinct_products_viewed,
+                    distinct_categories_viewed = EXCLUDED.distinct_categories_viewed,
+                    days_since_first_seen = EXCLUDED.days_since_first_seen,
+                    days_since_last_activity = EXCLUDED.days_since_last_activity,
+                    updated_at = EXCLUDED.updated_at
+            """),
+            {
+                "tenant_id": tenant_id,
+                "checkpoint_after": checkpoint_after,
+            },
+        )
+        return result.rowcount if result.rowcount is not None else 0
+
+    def _save_checkpoint(self, tenant_id: str, checkpoint_after):
+        self.session.exec(
+            text("""
+                INSERT INTO pipeline_checkpoints (
+                    tenant_id,
+                    pipeline_name,
+                    last_event_ts,
+                    updated_at
+                )
+                VALUES (
+                    :tenant_id,
+                    :pipeline_name,
+                    :last_event_ts,
+                    now()
+                )
+                ON CONFLICT (tenant_id, pipeline_name)
+                DO UPDATE SET
+                    last_event_ts = EXCLUDED.last_event_ts,
+                    updated_at = EXCLUDED.updated_at
+            """),
+            {
+                "tenant_id": tenant_id,
+                "pipeline_name": PIPELINE_NAME,
+                "last_event_ts": checkpoint_after,
+            },
+        )
+
+
     def _recompute_and_upsert_features(
         self,
         tenant_id: str,
