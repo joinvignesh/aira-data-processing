@@ -24,7 +24,7 @@ class ProductCooccurrencePipelineService:
 
         self.session.exec(
             text("DELETE FROM product_cooccurrence WHERE tenant_id = :tenant_id"),
-            {"tenant_id": tenant_id},
+            params={"tenant_id": tenant_id},
         )
 
         upserted = self._compute_and_upsert(tenant_id=tenant_id, computed_at=computed_at)
@@ -46,7 +46,7 @@ class ProductCooccurrencePipelineService:
                         e.customer_id,
                         e.product_id,
                         e.timestamp
-                    FROM events e
+                    FROM interactionevent e
                     WHERE e.tenant_id = :tenant_id
                     AND e.event_type = 'purchase'
                     AND e.product_id IS NOT NULL
@@ -114,6 +114,7 @@ class ProductCooccurrencePipelineService:
                 )
 
                 INSERT INTO product_cooccurrence (
+                    id,
                     tenant_id,
                     product_a_id,
                     product_b_id,
@@ -122,6 +123,7 @@ class ProductCooccurrencePipelineService:
                     last_updated
                 )
                 SELECT
+                    gen_random_uuid(),
                     tenant_id,
                     product_a_id,
                     product_b_id,
@@ -135,7 +137,7 @@ class ProductCooccurrencePipelineService:
                     confidence = EXCLUDED.confidence,
                     last_updated = EXCLUDED.last_updated
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "computed_at": computed_at,
             },
