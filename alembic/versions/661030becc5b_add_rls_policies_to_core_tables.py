@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -63,6 +64,29 @@ def upgrade():
         PARTITION OF interactionevent 
         FOR VALUES FROM ('2026-04-01') TO ('2026-05-01');
     """)
+
+    # ---------------------------------------------------------------------------
+    # 1. Create the Table and index it for historic lookup
+    op.create_table(
+        "recommendation_decisions",
+        sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("tenant_id", sa.Text(), nullable=False),
+        sa.Column("customer_id", sa.Text(), nullable=False),
+        sa.Column("surface", sa.String(length=100), nullable=False),
+        sa.Column("decision_id", sa.String(length=100), nullable=False),
+        sa.Column("model_version", sa.String(length=100), nullable=False),
+        sa.Column("response_items", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("latency_ms", sa.Float(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.UniqueConstraint("decision_id", name="uq_recommendation_decisions_decision_id"),
+    )
+    op.create_index(
+        "ix_recommendation_decisions_tenant_customer_created_at",
+        "recommendation_decisions",
+        ["tenant_id", "customer_id", "created_at"],
+        unique=False,
+    )
+    
 
 def downgrade():
     # This is for "undoing" your changes

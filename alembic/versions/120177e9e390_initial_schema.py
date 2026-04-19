@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 import sqlmodel
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -90,7 +91,7 @@ def upgrade() -> None:
         sa.Column("distinct_categories_viewed", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("days_since_first_seen", sa.Integer(), nullable=True),
         sa.Column("days_since_last_activity", sa.Integer(), nullable=True),
-        sa.Column("category_affinity", sa.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column("category_affinity", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")),
         sa.Column("avg_days_between_purchases", sa.Float(), nullable=True),
         sa.Column("total_revenue", sa.Numeric(12, 2), nullable=False, server_default="0"),
         sa.Column("avg_order_value", sa.Numeric(12, 2), nullable=True),
