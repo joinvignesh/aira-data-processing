@@ -1,0 +1,6 @@
+{
+    "customer_id": "cust_1",
+    "surface": "home",
+    "limit": 5,
+    "exclude_product_ids": []
+}
