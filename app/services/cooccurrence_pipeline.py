@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlmodel import Session
 
@@ -20,7 +20,7 @@ class ProductCooccurrencePipelineService:
         self.session = session
 
     def run_for_tenant(self, tenant_id: str) -> CooccurrencePipelineResult:
-        computed_at = datetime.utcnow()
+        computed_at = datetime.now(timezone.utc)
 
         self.session.exec(
             text("DELETE FROM product_cooccurrence WHERE tenant_id = :tenant_id"),

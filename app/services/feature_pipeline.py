@@ -83,7 +83,7 @@ class CustomerFeaturePipelineService:
         """)
         row = self.session.exec(
             stmt,
-            {
+            params={
                 "tenant_id": tenant_id,
                 "pipeline_name": PIPELINE_NAME,
             },
@@ -97,13 +97,13 @@ class CustomerFeaturePipelineService:
     ) -> datetime | None:
         stmt = text("""
             SELECT MAX(timestamp) AS max_ts
-            FROM events
+            FROM interactionevent
             WHERE tenant_id = :tenant_id
               AND (:checkpoint_before IS NULL OR timestamp > :checkpoint_before)
         """)
         row = self.session.exec(
             stmt,
-            {
+            params={
                 "tenant_id": tenant_id,
                 "checkpoint_before": checkpoint_before,
             },
@@ -121,11 +121,11 @@ class CustomerFeaturePipelineService:
         self.session.exec(text("""
             CREATE TEMP TABLE tmp_affected_customers AS
             SELECT DISTINCT e.customer_id
-            FROM events e
+            FROM interactionevent e
             WHERE e.tenant_id = :tenant_id
               AND (:checkpoint_before IS NULL OR e.timestamp > :checkpoint_before)
               AND e.timestamp <= :checkpoint_after
-        """), {
+        """), params={
             "tenant_id": tenant_id,
             "checkpoint_before": checkpoint_before,
             "checkpoint_after": checkpoint_after,
@@ -145,11 +145,11 @@ class CustomerFeaturePipelineService:
     ) -> int:
         row = self.session.exec(text("""
             SELECT COUNT(*)
-            FROM events
+            FROM interactionevent
             WHERE tenant_id = :tenant_id
               AND (:checkpoint_before IS NULL OR timestamp > :checkpoint_before)
               AND timestamp <= :checkpoint_after
-        """), {
+        """), params={
             "tenant_id": tenant_id,
             "checkpoint_before": checkpoint_before,
             "checkpoint_after": checkpoint_after,
@@ -168,8 +168,8 @@ class CustomerFeaturePipelineService:
                         e.event_type,
                         e.timestamp,
                         p.category
-                    FROM events e
-                    LEFT JOIN products p
+                    FROM interactionevent e
+                    LEFT JOIN product p
                       ON p.id = e.product_id
                      AND p.tenant_id = e.tenant_id
                     INNER JOIN tmp_affected_customers ac
@@ -225,7 +225,7 @@ class CustomerFeaturePipelineService:
                     days_since_last_activity = EXCLUDED.days_since_last_activity,
                     updated_at = EXCLUDED.updated_at
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "checkpoint_after": checkpoint_after,
             },
@@ -252,7 +252,7 @@ class CustomerFeaturePipelineService:
                     last_event_ts = EXCLUDED.last_event_ts,
                     updated_at = EXCLUDED.updated_at
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "pipeline_name": PIPELINE_NAME,
                 "last_event_ts": checkpoint_after,
@@ -276,8 +276,8 @@ class CustomerFeaturePipelineService:
                     e.properties,
                     p.category,
                     COALESCE((e.properties ->> 'revenue')::numeric, 0) AS revenue
-                FROM events e
-                LEFT JOIN products p
+                FROM interactionevent e
+                LEFT JOIN product p
                   ON p.id = e.product_id
                  AND p.tenant_id = e.tenant_id
                 INNER JOIN tmp_affected_customers ac
@@ -480,7 +480,7 @@ class CustomerFeaturePipelineService:
                 updated_at = EXCLUDED.updated_at
         """)
 
-        result = self.session.exec(stmt, {
+        result = self.session.exec(stmt, params={
             "tenant_id": tenant_id,
             "checkpoint_after": checkpoint_after,
         })
@@ -509,7 +509,7 @@ class CustomerFeaturePipelineService:
             DO UPDATE SET
                 last_event_ts = EXCLUDED.last_event_ts,
                 updated_at = EXCLUDED.updated_at
-        """), {
+        """), params={
             "tenant_id": tenant_id,
             "pipeline_name": PIPELINE_NAME,
             "last_event_ts": checkpoint_value,

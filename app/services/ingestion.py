@@ -1,6 +1,7 @@
 import io
 import time
 import csv
+import json
 from typing import List
 from uuid import UUID
 from app.models.schemas import EventCreate
@@ -9,27 +10,44 @@ from app.db.session import engine
 def bulk_ingest_events(tenant_id: UUID, events: List[EventCreate]):
     start_time = time.perf_counter()
     
-    # We use the raw psycopg connection for maximum speed
+    # Get the underlying psycopg2 connection
     raw_conn = engine.raw_connection()
     try:
         with raw_conn.cursor() as cur:
-            # Prepare the data in CSV format in memory
-            # This is significantly faster than standard inserts
+            # Use a StringIO buffer to hold TSV (Tab Separated Values) data
             f = io.StringIO()
-            for event in events:
-                # Format: id, tenant_id, customer_id, event_type, product_id, properties, timestamp
-                # Note: properties (dict) must be converted to JSON string
-                f.write(f"{tenant_id}\t{event.customer_id}\t{event.event_type}\t"
-                        f"{event.product_id or ''}\t{event.properties}\t{event.timestamp}\n")
+            # Use the csv writer to handle escaping/special characters correctly
+            writer = csv.writer(f, delimiter='\t', quoting=csv.QUOTE_MINIMAL)
             
+            for event in events:
+                # Convert properties dict to a JSON string for Postgres JSONB column
+                properties_json = json.dumps(event.properties)
+                
+                writer.writerow([
+                    tenant_id,
+                    event.customer_id,
+                    event.event_type,
+                    event.product_id if event.product_id else "",
+                    properties_json,
+                    event.timestamp
+                ])
+            
+            # Reset buffer pointer to the beginning
             f.seek(0)
             
-            # Use the COPY command
-            with cur.copy("COPY interactionevent (tenant_id, customer_id, event_type, product_id, properties, timestamp) FROM STDIN") as copy:
-                copy.write(f.read())
+            # Psycopg2 syntax for COPY:
+            sql = """
+                COPY interactionevent (
+                    tenant_id, customer_id, event_type, product_id, properties, timestamp
+                ) FROM STDIN WITH (FORMAT CSV, DELIMITER '\t')
+            """
+            cur.copy_expert(sql, f)
                 
         raw_conn.commit()
         
+    except Exception as e:
+        raw_conn.rollback()
+        raise e
     finally:
         raw_conn.close()
 
