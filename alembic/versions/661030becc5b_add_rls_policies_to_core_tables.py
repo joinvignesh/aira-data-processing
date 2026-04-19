@@ -36,11 +36,7 @@ def upgrade():
         USING (tenant_id = nullif(current_setting('app.current_tenant', TRUE), '')::uuid);
     """)
 
-    # Without this, the app_user won't even be allowed to look at the table to check the RLS!
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;")
-    op.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;")
 
-    # ---------------------------------------------------------------------------
     # 1. Drop the old table if it exists
     op.execute("DROP TABLE IF EXISTS interactionevent;")
 
@@ -86,6 +82,10 @@ def upgrade():
         ["tenant_id", "customer_id", "created_at"],
         unique=False,
     )
+    
+    # Without this, the app_user won't even be allowed to look at the table to check the RLS!
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;")
+    op.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;")
     
 
 def downgrade():

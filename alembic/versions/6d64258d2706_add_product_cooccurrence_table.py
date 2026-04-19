@@ -42,6 +42,8 @@ def upgrade() -> None:
         ["tenant_id", "product_a_id", "confidence", "co_count"],
         unique=False,
     )
+    
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;")
 
 
 def downgrade() -> None:
