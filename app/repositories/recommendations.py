@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from sqlalchemy import text
 from sqlmodel import Session
 
@@ -27,7 +28,7 @@ class RecommendationRepository:
                 WHERE tenant_id = :tenant_id
                   AND customer_id = :customer_id
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "customer_id": customer_id,
             },
@@ -43,7 +44,7 @@ class RecommendationRepository:
                     SELECT
                         product_id,
                         MAX(timestamp) AS last_seen
-                    FROM events
+                    FROM interactionevent
                     WHERE tenant_id = :tenant_id
                       AND customer_id = :customer_id
                       AND product_id IS NOT NULL
@@ -54,7 +55,7 @@ class RecommendationRepository:
                 ORDER BY last_seen DESC
                 LIMIT :limit
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "customer_id": customer_id,
                 "limit": limit,
@@ -83,7 +84,7 @@ class RecommendationRepository:
                 SELECT
                     p.id AS product_id,
                     MAX(ar.affinity_score) AS score
-                FROM products p
+                FROM product p
                 JOIN affinity_rows ar
                   ON ar.category = p.category
                 WHERE p.tenant_id = :tenant_id
@@ -92,9 +93,9 @@ class RecommendationRepository:
                 ORDER BY score DESC, p.id
                 LIMIT :limit
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
-                "category_affinity": category_affinity,
+                "category_affinity": json.dumps(category_affinity),
                 "limit": limit,
             },
         ).mappings().all()
@@ -114,7 +115,7 @@ class RecommendationRepository:
                 ORDER BY confidence DESC, co_count DESC, product_b_id
                 LIMIT :limit
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "product_id": product_id,
                 "limit": limit,
@@ -130,7 +131,7 @@ class RecommendationRepository:
                     SELECT
                         product_id,
                         event_type
-                    FROM events
+                    FROM interactionevent
                     WHERE tenant_id = :tenant_id
                       AND product_id IS NOT NULL
                       AND timestamp >= now() - interval '30 days'
@@ -150,14 +151,14 @@ class RecommendationRepository:
                     p.id AS product_id,
                     pop.score
                 FROM popularity pop
-                JOIN products p
+                JOIN product p
                   ON p.id = pop.product_id
                  AND p.tenant_id = :tenant_id
                 WHERE p.active = true
                 ORDER BY pop.score DESC, p.id
                 LIMIT :limit
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "limit": limit,
             },
@@ -178,6 +179,7 @@ class RecommendationRepository:
         self.session.exec(
             text("""
                 INSERT INTO recommendation_decisions (
+                    id,
                     tenant_id,
                     customer_id,
                     surface,
@@ -188,6 +190,7 @@ class RecommendationRepository:
                     created_at
                 )
                 VALUES (
+                    gen_random_uuid(),
                     :tenant_id,
                     :customer_id,
                     :surface,
@@ -198,13 +201,13 @@ class RecommendationRepository:
                     now()
                 )
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "customer_id": customer_id,
                 "surface": surface,
                 "decision_id": decision_id,
                 "model_version": model_version,
-                "response_items": response_items,
+                "response_items": json.dumps(response_items),
                 "latency_ms": latency_ms,
             },
         )
