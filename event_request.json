@@ -1,0 +1,13 @@
+{
+    "events": [
+        {
+            "customer_id": "cust_1",
+            "event_type": "product_view",
+            "product_id": "1d76d073-0c56-4695-b75c-ed1ee0c5d6a3",
+            "properties": {
+                "source": "benchmark"
+            },
+            "timestamp": "2026-04-19T06:30:00Z"
+        }
+    ]
+}
