@@ -5,7 +5,13 @@ from sqlmodel import Session
 from app.db.session import engine
 from app.models.domain import Product, Tenant
 
-admin_engine = create_engine("postgresql://app_admin:admin_password@localhost:5432/aira")
+import os
+
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+psycopg2://postgres:postgres@localhost:5432/aira",
+)
+admin_engine = create_engine(TEST_DATABASE_URL)
 
 def test_tenant_isolation_rls():
     """

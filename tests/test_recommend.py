@@ -15,7 +15,7 @@ from app.db.dependencies import get_db
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://postgres:postgres@localhost:5432/aira",
+    "postgresql+psycopg2://postgres:postgres@localhost:5432/aira",
 )
 
 
@@ -25,11 +25,7 @@ def engine():
     return engine
 
 
-@pytest.fixture(scope="session", autouse=True)
-def create_test_schema(engine):
-    SQLModel.metadata.create_all(engine)
-    yield
-    SQLModel.metadata.drop_all(engine)
+
 
 
 @pytest.fixture()
@@ -72,7 +68,7 @@ def seed_recommendation_data(session: Session):
             INSERT INTO tenant (id, name, slug, plan_tier, created_at)
             VALUES (:id, :name, :slug, :plan_tier, :created_at)
         """),
-        {
+        params={
             "id": tenant_id,
             "name": "Test Tenant",
             "slug": f"test-tenant-{tenant_id[:8]}",
@@ -92,7 +88,7 @@ def seed_recommendation_data(session: Session):
                 (:p2, :tenant_id, 'ext-2', 'Earbuds', 'Earbuds desc', 99.0, 'USD', 'electronics', '[]', '{}'::json, true, :created_at),
                 (:p3, :tenant_id, 'ext-3', 'Case', 'Case desc', 29.0, 'USD', 'accessories', '[]', '{}'::json, true, :created_at)
         """),
-        {
+        params={
             "p1": product_1,
             "p2": product_2,
             "p3": product_3,
@@ -142,7 +138,7 @@ def seed_recommendation_data(session: Session):
                 :updated_at
             )
         """),
-        {
+        params={
             "id": str(uuid4()),
             "tenant_id": tenant_id,
             "customer_id": customer_id,
@@ -165,7 +161,7 @@ def seed_recommendation_data(session: Session):
                 (:id1, :tenant_id, :p1, :p2, 5, 0.80, :updated_at),
                 (:id2, :tenant_id, :p1, :p3, 3, 0.45, :updated_at)
         """),
-        {
+        params={
             "id1": str(uuid4()),
             "id2": str(uuid4()),
             "tenant_id": tenant_id,
@@ -191,7 +187,7 @@ def seed_recommendation_data(session: Session):
                 (:e1, :tenant_id, :customer_id, 'product_view', :p1, '{}'::json, :ts1),
                 (:e2, :tenant_id, :customer_id, 'add_to_cart', :p1, '{}'::json, :ts2)
         """),
-        {
+        params={
             "e1": str(uuid4()),
             "e2": str(uuid4()),
             "tenant_id": tenant_id,
