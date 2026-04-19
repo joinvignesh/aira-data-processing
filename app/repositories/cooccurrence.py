@@ -29,7 +29,7 @@ class CooccurrenceRepository:
                 ORDER BY confidence DESC, co_count DESC, product_b_id
                 LIMIT :limit
             """),
-            {
+            params={
                 "tenant_id": tenant_id,
                 "product_id": product_id,
                 "limit": limit,
