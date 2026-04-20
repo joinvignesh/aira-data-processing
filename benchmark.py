@@ -6,8 +6,21 @@ import argparse
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 
+# Modified fetch_url snippet
+import httpx
+
+# Create a global client to reuse connections
+client = httpx.Client(limits=httpx.Limits(max_connections=100))
 
 def fetch_url(url, headers, data=None, method="POST"):
+    start_time = time.perf_counter()
+    try:
+        response = client.request(method, url, json=data, headers=headers)
+        return response.status_code, time.perf_counter() - start_time, None
+    except Exception as e:
+        return 0, time.perf_counter() - start_time, str(e)
+
+def fetch_url_old(url, headers, data=None, method="POST"):
     start_time = time.perf_counter()
     try:
         req_data = json.dumps(data).encode("utf-8") if data else None

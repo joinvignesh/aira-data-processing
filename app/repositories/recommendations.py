@@ -11,6 +11,34 @@ class RecommendationRepository:
     def __init__(self, session: Session):
         self.session = session
 
+    def get_top_related_products_batch(self, tenant_id: str, product_ids: list[str], limit_per_product: int = 50):
+        if not product_ids:
+            return []
+
+        # Use CAST(:variable AS type) instead of :variable::type
+        # This prevents the colon syntax conflict in SQLAlchemy
+        query = text("""
+            SELECT 
+                product_a_id AS anchor_product_id, 
+                product_b_id AS product_id, 
+                confidence,
+                co_count
+            FROM product_cooccurrence
+            WHERE tenant_id = CAST(:t_id AS UUID)
+            AND product_a_id = ANY(CAST(:p_ids AS UUID[]))
+            ORDER BY product_a_id, confidence DESC, co_count DESC
+        """)
+
+        result = self.session.execute(
+            query, 
+            params={
+                "t_id": tenant_id, 
+                "p_ids": product_ids
+            }
+        )
+        
+        return [dict(row) for row in result.mappings()]
+
     def get_customer_features(self, tenant_id: str, customer_id: str):
         row = self.session.exec(
             text("""
@@ -176,38 +204,47 @@ class RecommendationRepository:
         response_items: list[dict],
         latency_ms: float,
     ) -> None:
-        self.session.exec(
-            text("""
-                INSERT INTO recommendation_decisions (
-                    id,
-                    tenant_id,
-                    customer_id,
-                    surface,
-                    decision_id,
-                    model_version,
-                    response_items,
-                    latency_ms,
-                    created_at
-                )
-                VALUES (
-                    gen_random_uuid(),
-                    :tenant_id,
-                    :customer_id,
-                    :surface,
-                    :decision_id,
-                    :model_version,
-                    CAST(:response_items AS jsonb),
-                    :latency_ms,
-                    now()
-                )
-            """),
-            params={
-                "tenant_id": tenant_id,
-                "customer_id": customer_id,
-                "surface": surface,
-                "decision_id": decision_id,
-                "model_version": model_version,
-                "response_items": json.dumps(response_items),
-                "latency_ms": latency_ms,
-            },
-        )
+        try:
+            self.session.exec(
+                text("""
+                    INSERT INTO recommendation_decisions (
+                        id,
+                        tenant_id,
+                        customer_id,
+                        surface,
+                        decision_id,
+                        model_version,
+                        response_items,
+                        latency_ms,
+                        created_at
+                    )
+                    VALUES (
+                        gen_random_uuid(),
+                        :tenant_id,
+                        :customer_id,
+                        :surface,
+                        :decision_id,
+                        :model_version,
+                        CAST(:response_items AS jsonb),
+                        :latency_ms,
+                        now()
+                    )
+                """),
+                params={
+                    "tenant_id": tenant_id,
+                    "customer_id": customer_id,
+                    "surface": surface,
+                    "decision_id": decision_id,
+                    "model_version": model_version,
+                    "response_items": json.dumps(response_items),
+                    "latency_ms": latency_ms,
+                },
+            )
+            # CRITICAL: Background tasks require an explicit commit
+            self.session.commit() 
+            
+        except Exception as e:
+            # If logging fails, we rollback so the session stays clean
+            self.session.rollback()
+            # Log the error to your console so you can see it during the benchmark
+            print(f"Logging Error: {e}")

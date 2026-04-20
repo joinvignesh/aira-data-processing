@@ -4,7 +4,12 @@ import os
 
 # Use app_user for regular requests (RLS enforced)
 DATABASE_URL = "postgresql://app_user:app_password@localhost:5432/aira"
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=50,          # Match foreground concurrency
+    max_overflow=50,       # Allow another 50 for background tasks/spikes
+    pool_recycle=1800,
+)
 
 def get_db_session(tenant_id: str):
     """
