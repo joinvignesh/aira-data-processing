@@ -232,19 +232,16 @@ python benchmark.py --url http://127.0.0.1:8000/api/v1/recommend --payload recom
 
 ### 7.3 10,000 requests, concurrency 50
 
-- Total time: 119.7459 secs
-- Throughput: **83.51 req/s**
-- Fastest: 0.0026 sec
-- Slowest: 1.9039 sec
-- Average: 0.5960 sec
-- P50: 0.6256 sec
-- P90: 0.8575 sec
-- P95: 0.9228 sec
-- P99: 1.3034 sec
-- Status codes:
-  - [200] 8656 responses
-  - [0] 1325 responses (Socket reuse / WinError 10048)
-  - [500] 19 responses (Internal Server Error)
+- Total time: 88.3158 secs
+- Throughput: **113.23 req/s**
+- Fastest: 0.0520 sec
+- Slowest: 1.7230 sec
+- Average: 0.4402 sec
+- P50: 0.3993 sec
+- P90: 0.6096 sec
+- P95: 0.6695 sec
+- P99: 0.8309 sec
+- Status codes: [200] 10000 responses
 
 ---
 
